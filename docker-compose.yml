@@ -1,0 +1,73 @@
+version: "3"
+services:
+  mongo:
+    container_name: wallet-listeners-mongo
+    image: "mongo:4"
+    restart: always
+
+  rabbitmq:
+    container_name: ethereum-wallet-listener-rabbitmq
+    image: "rabbitmq:3-management"
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    restart: always
+
+  address-listener:
+    container_name: ethereum-address-listener
+    build:
+      context: ./address-listener
+      dockerfile: dev.Dockerfile
+    image: ethereum-address-listener
+    volumes:
+      - ./address-listener:/usr/app/
+      - /usr/app/node_modules
+    depends_on:
+      - mongo
+      - rabbitmq
+    command: bash -c "sh wait_for_queue.sh && npm run seed-mongo && npm run dev"
+    env_file:
+      - eth.env
+    restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  wallet-identifier:
+    container_name: ethereum-wallet-identifier
+    build:
+      context: ./wallet-identifier
+      dockerfile: dev.Dockerfile
+    image: ethereum-wallet-identifier
+    volumes:
+      - ./wallet-identifier:/usr/app/
+      - /usr/app/node_modules
+    depends_on:
+      - address-listener
+      - mongo
+      - rabbitmq
+    command: bash -c "sh wait_for_queue.sh && npm run dev"
+    env_file:
+      - eth.env
+    restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  update-balance:
+    container_name: ethereum-update-balance
+    build:
+      context: ./update-balance
+      dockerfile: dev.Dockerfile
+    image: ethereum-update-balance
+    volumes:
+      - ./update-balance:/usr/app/
+      - /usr/app/node_modules
+    depends_on:
+      - address-listener
+      - wallet-identifier
+      - mongo
+      - rabbitmq
+    command: bash -c "sh wait_for_queue.sh && npm run dev"
+    env_file:
+      - eth.env
+    restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

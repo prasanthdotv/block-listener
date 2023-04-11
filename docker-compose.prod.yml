@@ -1,0 +1,59 @@
+version: "3"
+services:
+  rabbitmq:
+    container_name: ethereum-wallet-listener-rabbitmq
+    image: "rabbitmq:3-management"
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    restart: always
+
+  address-listener:
+    image: ethereum-address-listener
+    container_name: ethereum-address-listener
+    build:
+      context: ./address-listener
+      dockerfile: Dockerfile
+    volumes:
+      - /usr/app/node_modules
+      - ./rds-combined-ca-bundle.pem:/usr/app/rds-combined-ca-bundle.pem
+    depends_on:
+      - rabbitmq
+    command: bash -c "sh wait_for_queue.sh && npm run seed-mongo && npm run start"
+    env_file:
+      - .env
+    restart: always
+
+  wallet-identifier:
+    image: ethereum-wallet-identifier
+    container_name: ethereum-wallet-identifier
+    build:
+      context: ./wallet-identifier
+      dockerfile: Dockerfile
+    volumes:
+      - /usr/app/node_modules
+      - ./rds-combined-ca-bundle.pem:/usr/app/rds-combined-ca-bundle.pem
+    depends_on:
+      - address-listener
+      - rabbitmq
+    command: bash -c "sh wait_for_queue.sh && npm run start"
+    env_file:
+      - .env
+    restart: always
+
+  update-balance:
+    image: ethereum-update-balance
+    container_name: ethereum-update-balance
+    build:
+      context: ./update-balance
+      dockerfile: Dockerfile
+    volumes:
+      - /usr/app/node_modules
+      - ./rds-combined-ca-bundle.pem:/usr/app/rds-combined-ca-bundle.pem
+    depends_on:
+      - address-listener
+      - wallet-identifier
+      - rabbitmq
+    command: bash -c "sh wait_for_queue.sh && npm run start"
+    env_file:
+      - .env
+    restart: always

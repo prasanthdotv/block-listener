@@ -1,0 +1,9 @@
+.vscode/
+node_modules/
+logs
+dist-server/
+*.env
+*.pem
+rabbitmq.conf
+
+!sample.env
